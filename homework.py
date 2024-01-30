@@ -4,9 +4,9 @@ import sys
 import time
 from http import HTTPStatus
 
-from dotenv import load_dotenv
 import requests
 import telegram
+from dotenv import load_dotenv
 
 import exceptions
 
@@ -21,37 +21,22 @@ RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='main.log',
-    filemode='w',
-    format='%(asctime)s - %(levelname)s - %(message)s - %(name)s'
-)
-logger = logging.getLogger(__name__)
-logger.addHandler(
-    logging.StreamHandler()
-)
-
-
 HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+logger = logging.getLogger(__name__)
+
 
 def check_tokens():
     """Проверка наличия переменных окружения."""
-    if PRACTICUM_TOKEN is None:
-        logger.critical(f'Отсутствует обязательная переменная окружения:'
-                        f'{PRACTICUM_TOKEN}')
-    if TELEGRAM_TOKEN is None:
-        logger.critical(f'Отсутствует обязательная переменная окружения:'
-                        f'{TELEGRAM_TOKEN}')
-    if TELEGRAM_CHAT_ID is None:
-        logger.critical(f'Отсутствует обязательная переменная окружения:'
-                        f'{TELEGRAM_CHAT_ID}')
-    return all([TELEGRAM_TOKEN, PRACTICUM_TOKEN, TELEGRAM_CHAT_ID])
+    if all([TELEGRAM_TOKEN, PRACTICUM_TOKEN, TELEGRAM_CHAT_ID]):
+        return True
+    else:
+        logger.critical('Отсутствуют обязательные переменные окружения')
+        return False
 
 
 def send_message(bot, message):
@@ -103,6 +88,8 @@ def parse_status(homework):
     """Парсинг статуса работы."""
     if 'homework_name' not in homework:
         raise KeyError('В ответе нету ключа homework_name')
+    if 'status' not in homework:
+        raise KeyError('В ответе нету ключа status')
     homework_name = homework.get('homework_name')
     homework_verdict = homework.get('status')
     if homework_verdict not in HOMEWORK_VERDICTS:
@@ -118,11 +105,7 @@ def main():
         sys.exit('Нету обязательных переменных окружения')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    api_message = {
-        'homework_name': '',
-        'status': ''
-    }
-    old_api_message = api_message.copy()
+    old_status = new_status = ''
     logger.debug('Запуск работы бота')
     while True:
         try:
@@ -131,23 +114,32 @@ def main():
             new_homeworks = check_response(response)
             if new_homeworks:
                 homework = new_homeworks[0]
-                api_message['homework_name'] = homework.get('homework_name')
-                api_message['status'] = homework.get('status')
+                new_status = homework.get('status')
             else:
-                api_message['status'] = 'empty'
-            if api_message != old_api_message:
+                old_status = 'empty'
+            if new_status != old_status:
                 message = parse_status(homework)
                 send_message(bot, message)
-                old_api_message = api_message.copy()
+                old_status = new_status
             else:
                 logger.debug('Нету новых домашек')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            api_message['status'] = message
+            new_status = message
             logger.error(message)
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        filename='main.log',
+        filemode='w',
+        format='%(asctime)s - %(levelname)s - %(message)s - %(name)s'
+    )
+    logger.addHandler(
+        logging.StreamHandler()
+    )
+
     main()
