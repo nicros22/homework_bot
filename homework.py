@@ -105,7 +105,7 @@ def main():
         sys.exit('Нету обязательных переменных окружения')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    old_status = new_status = ''
+    old_status = new_status = 'empty'
     logger.debug('Запуск работы бота')
     while True:
         try:
