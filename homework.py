@@ -86,10 +86,8 @@ def check_response(response):
 
 def parse_status(homework):
     """Парсинг статуса работы."""
-    if 'homework_name' not in homework:
-        raise KeyError('В ответе нету ключа homework_name')
-    if 'status' not in homework:
-        raise KeyError('В ответе нету ключа status')
+    if 'homework_name' not in homework or 'status' not in homework:
+        raise KeyError('В ответе нету ключа homework_name или status')
     homework_name = homework.get('homework_name')
     homework_verdict = homework.get('status')
     if homework_verdict not in HOMEWORK_VERDICTS:
@@ -105,7 +103,7 @@ def main():
         sys.exit('Нету обязательных переменных окружения')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    old_status = new_status = 'empty'
+    old_status = new_status = ''
     logger.debug('Запуск работы бота')
     while True:
         try:
@@ -116,7 +114,7 @@ def main():
                 homework = new_homeworks[0]
                 new_status = homework.get('status')
             else:
-                old_status = 'empty'
+                old_status = ''
             if new_status != old_status:
                 message = parse_status(homework)
                 send_message(bot, message)
